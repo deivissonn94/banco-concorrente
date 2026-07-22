@@ -1,0 +1,28 @@
+# Executáveis Linux
+servidor
+cliente
+
+# Executáveis Windows
+*.exe
+
+# Objetos gerados pelo compilador
+*.o
+*.obj
+
+# Bibliotecas
+*.a
+*.lib
+*.dll
+*.so
+
+# Arquivos temporários
+*.tmp
+
+# Arquivos de log
+*.log
+
+# Arquivos do VS Code
+.vscode/
+
+# Banco de dados gerado pelo programa
+contas.dat
