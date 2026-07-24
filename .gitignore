@@ -1,6 +1,7 @@
 # Executáveis Linux
 servidor
 cliente
+conta
 
 # Executáveis Windows
 *.exe
@@ -26,3 +27,4 @@ cliente
 
 # Banco de dados gerado pelo programa
 contas.dat
+arquivo.dat
