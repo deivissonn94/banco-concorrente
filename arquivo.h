@@ -4,6 +4,19 @@
 #include "conta.h"
 
 
+int abrir_arquivo_leitura(FILE **arquivo);
 
+int abrir_arquivo_escrita(FILE **arquivo);
+
+int gravar_dados(const Conta *conta,FILE *arquivo);
+
+int ler_dados(Conta *cliente,FILE *arquivo);
+
+void fechar_arquivo(FILE *arquivo);
+
+int carregar_contas(Lista *lista,FILE **arquivo);
+
+//não e exclusivo 
+int inserindo_conta(Lista *lista,FILE **arquivo,const char *nome,size_t tamanho_nome);
 
 #endif

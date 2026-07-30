@@ -4,6 +4,30 @@
 #include "conta.h"
 
 //funções da Lista e NO
+void liberar_lista(Lista *lista){
+
+    if (lista == NULL)
+        return;
+
+    No *atual = lista->cabeca;
+
+    while (atual != NULL)
+    {   
+        No *aux = atual;
+
+        atual= atual->proximo;
+        
+        liberar_conta(aux->conta);
+        free(aux);
+
+
+
+    }
+    
+    lista->cabeca =lista->cauda =NULL;
+}
+
+
 No *alocar_no(Conta *cliente){
 
     No *novo = calloc(1,sizeof(No));
@@ -37,24 +61,66 @@ int inserir_na_lista(Lista *lista,Conta *cliente){
 void iniciar_lista(Lista *lista){
 
     *lista = (Lista){0};
+    lista->proximo_numero = NUMERO_INICIAL_CONTA;
+}
+
+
+Conta *buscar_conta(Lista *lista,int numero){
+
+    if(!lista){
+
+        return NULL;
+    }
+
+    No *atual = lista->cabeca;
+
+    while (atual != NULL)
+    {
+        if(atual->conta->numero == numero){
+
+            return atual->conta;
+
+        }
+
+        atual = atual->proximo;
+    }
+
+    return NULL;
+    
+}
+
+void listar_contas(const Lista *lista){
+
+    No *atual = lista->cabeca;
+
+    while (atual != NULL)
+    {
+        printf("Numero : %d \n",atual->conta->numero);
+        printf("Nome : %s \n",atual->conta->nome);
+        printf("Saldo : %.2f \n\n",atual->conta->saldo);
+
+        atual = atual->proximo;
+    }
+
+    
 }
 
 
 
 
 
-
-
 //funções da Conta
-void cadastrando_conta(Conta *conta){
+void cadastrando_conta(Conta *conta,const char *buffer,size_t tamanho_nome,Lista *lista){
 
-    if(entrada_nome(&conta->nome) == -1){
+    if(conta == NULL){
 
-        printf("Erro ao cadastrar nome.\n");
         return;
     }
 
-    conta->numero = NUMERO_INICIAL_CONTA +1;
+
+    conta->nome = alocar_nome(tamanho_nome);
+    strcpy(conta->nome,buffer);
+    conta->numero = lista->proximo_numero++;
 
 }
 
@@ -71,32 +137,11 @@ Conta *criar_conta(){
      return novo;
 }
 
-int entrada_nome(char **nome){
 
-    char buffer[500];
-
-    printf("Digite seu nome para cadastro : ");
-
-    fgets(buffer,sizeof(buffer),stdin);
-    buffer[strcspn(buffer,"\n")] = '\0';
-
-    *nome = alocar_nome(strlen(buffer)+1);
-
-    if(*nome == NULL){
-
-        printf("Erro na alocacao do ponteiro.\n");
-        return -1;
-    }
-
-    strcpy(*nome,buffer);
-
-    return 0;
-
-}
 
 char *alocar_nome(size_t tamanho){
 
-    char *novo = malloc(tamanho);
+    char *novo = malloc(tamanho + 1);
 
     if(!novo){
 

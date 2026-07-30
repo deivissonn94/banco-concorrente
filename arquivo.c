@@ -4,117 +4,92 @@
 
 #include "arquivo.h"
 
-int abrir_arquivo_leitura(FILE **arquivo);
 
-int abrir_arquivo_escrita(FILE **arquivo);
+//outras funcoes 
 
-int gravar_dados(const Conta *conta,FILE *arquivo);
+int inserindo_conta(Lista *lista,FILE **arquivo,const char *nome,size_t tamanho_nome){
 
-int ler_dados(Conta *cliente,FILE *arquivo);
+    Conta *nova = criar_conta();
+    if(!nova){
 
-void fechar_arquivo(FILE *arquivo);
+        return -1;
 
-int main()
-{
-    FILE *arquivo = NULL;
+    } 
 
+    cadastrando_conta(nova,nome,tamanho_nome,lista);
 
-    //salavando dados
+    if(inserir_na_lista(lista,nova) == -1){
+        liberar_conta(nova);
+        return -1;
+    } 
 
-    Conta *c1 = criar_conta();
-    c1->numero = 1001;
-    c1->nome = "João Silva";
-    c1->saldo = 1500.50;
+    //persistencia
+    if(abrir_arquivo_escrita(arquivo) == -1){
 
-    Conta *c2 = criar_conta();
-    c2->numero = 1002;
-    c2->nome = "Maria Oliveira";
-    c2->saldo = 2750.00;
+        
+        return -1;
 
-    Conta *c3 = criar_conta();
-    c3->numero = 1003;
-    c3->nome = "Carlos Souza";
-    c3->saldo = 980.75;
+    } 
 
-    Conta *c4 = criar_conta();
-    c4->numero = 1004;
-    c4->nome = "Ana Pereira";
-    c4->saldo = 5200.30;
+    if(gravar_dados(lista->cauda->conta,*arquivo) == -1){
 
-    Conta *c5 = criar_conta();
-    c5->numero = 1005;
-    c5->nome = "Lucas Santos";
-    c5->saldo = 340.90;
-
-    Conta *contas[5] = {c1,c2,c3,c4,c5};
-
-    if(abrir_arquivo_escrita(&arquivo) == -1){
-
-        printf("Erro ao abrir arquivo !");
+        fechar_arquivo(*arquivo);
+        
         return -1;
     }
 
-    for(int i =0;i<5;i++){
-
-        if(gravar_dados(contas[i],arquivo) == -1){
-
-            printf("Erro ao gravar dados.\n");
-            return -1;
-        }
-    }
-
-    fechar_arquivo(arquivo);
+    fechar_arquivo(*arquivo);
+    return 0;
+} 
 
 
+//--------------------------------------------------------
 
-    //clientes que iram receber dados 
-    Conta *c1_recebedor = criar_conta();
-    Conta *c2_recebedor = criar_conta();
-    Conta *c3_recebedor = criar_conta();
-    Conta *c4_recebedor = criar_conta();
-    Conta *c5_recebedor = criar_conta();
+int carregar_contas(Lista *lista,FILE **arquivo){
 
-    Conta *clientes_r[5] ={c1_recebedor,c2_recebedor,c3_recebedor,c4_recebedor,c5_recebedor};
+    if(lista == NULL) return -1;
 
-    abrir_arquivo_leitura(&arquivo);
+    if(abrir_arquivo_leitura(arquivo)== -1) return -1;
 
-    int contador = 0;
 
-    while(ler_dados(clientes_r[contador],arquivo) != 0){
+    while (1)
+    {   
 
-        printf("Numero : %d \n",clientes_r[contador]->numero);
-        printf("Nome : %s \n",clientes_r[contador]->nome);
-        printf("Saldo : %2.f \n\n\n",clientes_r[contador]->saldo);
+        Conta *aux = criar_conta();
+        if(!aux) return -1;
 
-        contador++;
-    }
+        int resultado;
 
-    fechar_arquivo(arquivo);
-
-    /*
-
-    for(int i = 0;i<5;i++){
-
-        if(ler_dados(clientes_r[i],arquivo) == -1){
-
-            printf("Erro ao receber os dados.\n");
-            return -1;
-        }
-
-        printf("Numero : %d \n",clientes_r[i]->numero);
-        printf("Nome : %s \n",clientes_r[i]->nome);
-        printf("Saldo : %2.f \n\n\n",clientes_r[i]->saldo);
-    }
-
-    fechar_arquivo(arquivo);
+        resultado = ler_dados(aux,*arquivo);
 
     
-    printf("Numero : %d \n",cliente_recebedor->numero);
-    printf("Nome : %s \n",cliente_recebedor->nome);
-    printf("Saldo : %f \n",cliente_recebedor->saldo);
-    */
+        if(resultado == 1){
 
-    return 0;
+            if(aux->numero >= lista->proximo_numero){
+
+                lista->proximo_numero = aux->numero +1; 
+            }
+
+
+            if(inserir_na_lista(lista,aux) == -1){
+
+                liberar_conta(aux);
+                fechar_arquivo(*arquivo);
+                return -1;
+            }
+        }
+        else{
+
+            
+            liberar_conta(aux);
+            fechar_arquivo(*arquivo);
+            return resultado;
+        }
+    
+       
+    }
+
+
 }
 
 void fechar_arquivo(FILE *arquivo){
