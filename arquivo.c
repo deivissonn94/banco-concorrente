@@ -7,6 +7,51 @@
 
 //outras funcoes 
 
+int sacar(Lista *lista,int numero_conta,float saque){
+
+    if(lista == NULL){
+
+        return -1;
+    }
+
+    Conta *buscada = buscar_conta(lista,numero_conta);
+    if(buscada == NULL){
+
+        return -1;
+    }
+
+    if(buscada->saldo - saque < 0){
+
+        return -2;
+    }
+
+    buscada->saldo -= saque;
+
+    return gravando_dados_apos_alteracoes(lista);
+
+
+}
+
+int depositar(Lista *lista,int numero_conta,float deposito){
+
+    if(lista == NULL){
+
+        return -1;
+    }
+
+    Conta *buscada = buscar_conta(lista,numero_conta);
+    if(buscada == NULL){
+
+        return -1;
+    }
+
+    buscada->saldo += deposito;
+
+    return gravando_dados_apos_alteracoes(lista);
+
+
+}
+
 int inserindo_conta(Lista *lista,FILE **arquivo,const char *nome,size_t tamanho_nome){
 
     Conta *nova = criar_conta();
@@ -44,6 +89,33 @@ int inserindo_conta(Lista *lista,FILE **arquivo,const char *nome,size_t tamanho_
 
 
 //--------------------------------------------------------
+int gravando_dados_apos_alteracoes(Lista *lista){
+
+    FILE *arquivo = fopen("arquivo.dat","wb");
+
+    if (arquivo == NULL)
+        return -1;
+
+    No *atual = lista->cabeca;
+
+    while (atual != NULL)
+    {
+        if(gravar_dados(atual->conta,arquivo) != 0){
+
+            return -1;
+        }
+
+        atual = atual->proximo;
+    }
+
+    fclose(arquivo);
+
+    return 0;
+
+}
+
+
+
 
 int carregar_contas(Lista *lista,FILE **arquivo){
 

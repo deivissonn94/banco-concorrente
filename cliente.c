@@ -9,6 +9,10 @@
 
 #include <ws2tcpip.h> // inet_pton(), inet_ntop(), getaddrinfo()
 
+#define MAX_CAMPOS 5
+
+int parser_campos(char *buffer, char **campos);
+
 void exibir_menu(void);
 
 void capturar_entrada(char *buffer, size_t tamanho);
@@ -70,8 +74,6 @@ int main()
 
         capturar_entrada(buffer, sizeof(buffer));
 
-        int opcao = atoi(buffer);
-
         int bytes_enviados = send(socket_cliente, buffer, strlen(buffer), 0);
 
         if (bytes_enviados == SOCKET_ERROR)
@@ -82,50 +84,52 @@ int main()
             WSACleanup();
             return -1;
         }
-        
 
-        if (opcao == 1)
+        printf("Bytes enviados: %d\n", bytes_enviados);
+
+        char *campos[MAX_CAMPOS] = {0};
+
+        parser_campos(buffer, campos);
+
+        int opcao = atoi(campos[0]);
+
+        if (opcao == 4)
         {
 
-            char *nome = NULL;
+           
+            int bytes_recebidos = recv(socket_cliente, buffer, sizeof(buffer) - 1, 0);
 
-            if (entrada_nome(&nome) == -1)
-            {
-
-                printf("Erro ao receber. Codigo: %d\n", WSAGetLastError());
-                continue;
-            }
-
-            int bytes_nomes = send(socket_cliente, nome, strlen(nome), 0);
-
-            if (bytes_nomes == SOCKET_ERROR)
-            {
-
-                printf("Erro ao enviar a mensagem. Codigo: %d\n", WSAGetLastError());
-                closesocket(socket_cliente);
-                WSACleanup();
-                return -1;
-            }
-
-            int bytes_recebidos_cadastro = recv(socket_cliente, buffer, sizeof(buffer) - 1, 0);
-
-            if (bytes_recebidos_cadastro == SOCKET_ERROR)
+            if (bytes_recebidos == SOCKET_ERROR)
             {
 
                 printf("Erro ao receber. Codigo: %d\n", WSAGetLastError());
                 break;
             }
 
-            buffer[bytes_recebidos_cadastro] = '\0';
-            printf("%s\n",buffer);
+            buffer[bytes_recebidos] = '\0';
 
-            free(nome);
+            char *campos_r[4] = {0};
+
+            parser_campos(buffer, campos_r);
+
+
+            if (strcmp(campos_r[0],"ERRO") == 0)
+            {   
+
+                printf("%s : %s\n", campos_r[0], campos_r[1]);
+            }
+            else if (strcmp(campos_r[0],"OK") == 0)
+            {
+
+                printf("Conta : %s\n", campos_r[1]);
+                printf("Nome : %s\n", campos_r[2]);
+                printf("Saldo : %s\n\n", campos_r[3]);
+            }
 
             printf("Pressione enter para continuar.....");
             getchar();
 
             continue;
-
         }
 
         if (opcao == 5)
@@ -194,8 +198,6 @@ int main()
             continue;
         }
 
-        
-
         int bytes_recebidos = recv(socket_cliente, buffer, sizeof(buffer) - 1, 0);
 
         if (bytes_recebidos == SOCKET_ERROR)
@@ -223,11 +225,6 @@ int main()
     WSACleanup();
 
     return 0;
-}
-
-void parser_campos(char *buffer,char **campos){
-
-
 }
 
 void exibir_menu(void)
@@ -279,15 +276,40 @@ int entrada_nome(char **nome)
     return 0;
 }
 
-char *alocar_nome(size_t tamanho){
+char *alocar_nome(size_t tamanho)
+{
 
     char *novo = malloc(tamanho + 1);
 
-    if(!novo){
+    if (!novo)
+    {
 
-        
         return NULL;
     }
 
     return novo;
+}
+
+int parser_campos(char *buffer, char **campos)
+{
+
+    char *delimitador = buffer;
+    int c = 0;
+
+    for (int i = 0; buffer[i] != '\0'; i++)
+    {
+
+        if (buffer[i] == ';')
+        {
+
+            buffer[i] = '\0';
+
+            campos[c++] = delimitador;
+            delimitador = &buffer[i + 1];
+        }
+    }
+
+    campos[c] = delimitador;
+
+    return c + 1;
 }

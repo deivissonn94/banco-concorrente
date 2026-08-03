@@ -15,11 +15,20 @@
 
 #include <unistd.h> //sleep()
 
+#include <ctype.h>
 #include "arquivo.h"
+
+#define MAX_CAMPOS 5
+
+int valida_numero(char *buffer);
+
+int valida_float(char *valor);
 
 void capturar_entrada(char *buffer, size_t tamanho);
 
 int envia_lista(const Lista *lista, int socket_cliente);
+
+int parser_campos(char *buffer, char **campos);
 
 int main()
 {
@@ -90,6 +99,8 @@ int main()
 
         int bytes_recebidos = recv(socket_cliente, buffer, sizeof(buffer) - 1, 0);
 
+        printf("recv retornou %d\n", bytes_recebidos);
+
         // Trata o resultado do recv()
         if (bytes_recebidos == -1)
         {
@@ -106,35 +117,42 @@ int main()
 
         else
         {
+            buffer[bytes_recebidos] = '\0';
+            printf("Recebido: %s\n", buffer);
 
-            int opcao = atoi(buffer);
+            char *campos[MAX_CAMPOS] = {0};
+
+            int quantidade = parser_campos(buffer, campos);
+
+            printf("opcao : %s\n", campos[0]);
+            printf("Nome : %s\n", campos[1]);
+            printf("Saldo : %s\n", campos[2]);
+            printf("Conta : %s\n\n", campos[3]);
+
+            int opcao = atoi(campos[0]);
 
             char *mensagem = NULL;
+
+             char buffer_envio[1024];
+
 
             switch (opcao)
             {
             case 1:
             {
+                if(quantidade != 2 || campos[1] == NULL || strlen(campos[1]) == 0 ){
 
-                char nome[1024];
+                    mensagem = "Parametros enviados estao errados , ou incompletos.\n";
 
-                int bytes_recebidos_cadastro = recv(socket_cliente, nome, sizeof(nome) - 1, 0);
-
-                if (bytes_recebidos_cadastro == -1)
-                {
-
-                    perror("Erro ao receber bytes");
                     break;
                 }
-
-                nome[bytes_recebidos_cadastro] = '\0';
-
-                
-
-                if(inserindo_conta(&lista,&arquivo,nome,strlen(nome)) == -1){
+                if (inserindo_conta(&lista, &arquivo, campos[1], strlen(campos[1])) == -1)
+                {
 
                     mensagem = "Erro ao cadastrar conta.\n";
-                }else{
+                }
+                else
+                {
 
                     mensagem = "Cadastro realizado com sucesso.\n";
                 }
@@ -143,14 +161,115 @@ int main()
             }
 
             case 2:
-                mensagem = "Depositando...\n";
-                break;
+                {   
+
+                    if( quantidade != 3 ||
+                        campos[1] == NULL ||
+                        strlen(campos[1]) == 0 ||
+                        (valida_numero(campos[1]) == 0) ||
+                        campos[2] == NULL ||
+                        strlen(campos[2]) == 0 ||
+                        (valida_float(campos[2]) == 0))
+                        {
+
+                            mensagem = "Parametros enviados estao errados , ou incompletos.\n";
+
+                            break;
+
+
+                    }
+
+                    int num_conta = atoi(campos[1]);
+                    float valor = atof(campos[2]);
+
+                    if(depositar(&lista,num_conta,valor) == 0){
+
+                        mensagem = "Desposito realizado com sucesso .\n\n";
+                    }else{
+
+                        mensagem = "Falha ao realizar o deposito .\n\n";
+                    }
+
+                    break;
+                }
+                
+
+                
+                
             case 3:
-                mensagem = "Sacando...\n";
-                break;
+                {   
+
+                    if( quantidade != 3 ||
+                        campos[1] == NULL ||
+                        strlen(campos[1]) == 0 ||
+                        (valida_numero(campos[1]) == 0) ||
+                        campos[2] == NULL ||
+                        strlen(campos[2]) == 0 ||
+                        (valida_float(campos[2]) == 0))
+                        {
+
+                            mensagem = "Parametros enviados estao errados , ou incompletos.\n";
+
+                            break;
+
+
+                    }
+
+                    int num_conta = atoi(campos[1]);
+                    float valor = atof(campos[2]);
+
+                    int resultado = sacar(&lista,num_conta,valor);
+
+                    if(resultado == 0){
+
+                        mensagem = "Saque realizado com sucesso .\n\n";
+                    }else if(resultado == -2){
+
+                        mensagem = "Conta nao possui saldo para efetuar o saque .\n\n";
+                    }else{
+
+                        mensagem = "Falha ao realizar o deposito .\n\n";
+
+                    }
+
+                    break;
+                }
+                
+
             case 4:
-                mensagem = "Saldo...\n";
+            {
+
+                if(quantidade != 2 || campos[1] == NULL || strlen(campos[1]) == 0  || (valida_numero(campos[1])==0) ) {
+
+                    mensagem = "ERRO;Parametros enviados estao errados , ou incompletos.\n";
+
+                    break;
+
+                }
+
+               
+
+                int numero_conta = atoi(campos[1]);
+                Conta *buscada = buscar_conta(&lista, numero_conta);
+
+                if (!buscada)
+                {
+
+                    mensagem = "ERRO;Numero da conta nao entcontrado";
+                }
+                else
+                {
+
+                    snprintf(buffer_envio, sizeof(buffer_envio), "OK;%d;%s;%.2f\n",
+                             buscada->numero,
+                             buscada->nome,
+                             buscada->saldo);
+
+                    mensagem = buffer_envio;
+                }
+
                 break;
+            }
             case 5:
                 envia_lista(&lista, socket_cliente);
                 break;
@@ -169,7 +288,7 @@ int main()
                 break;
             }
 
-            if (opcao != 5)
+            if (opcao != 5 )
             {
 
                 int bytes_enviados = send(socket_cliente, mensagem, strlen(mensagem), 0);
@@ -188,6 +307,29 @@ int main()
     close(socket_servidor);
 
     return 0;
+}
+int parser_campos(char *buffer, char **campos)
+{
+
+    char *delimitador = buffer;
+    int c = 0;
+
+    for (int i = 0; buffer[i] != '\0'; i++)
+    {
+
+        if (buffer[i] == ';')
+        {
+
+            buffer[i] = '\0';
+
+            campos[c++] = delimitador;
+            delimitador = &buffer[i + 1];
+        }
+    }
+
+    campos[c] = delimitador;
+
+    return c +1;
 }
 
 void capturar_entrada(char *buffer, size_t tamanho)
@@ -240,4 +382,53 @@ int envia_lista(const Lista *lista, int socket_cliente)
     return 0;
 }
 
-// 1001;Maria;900.00
+int valida_numero(char *buffer){
+
+
+    for (size_t i = 0;buffer[i] != 0; i++)
+    {
+        if(isdigit(buffer[i]) == 0){
+
+            return 0;
+        }
+    }
+
+    return 1;
+    
+}
+
+int valida_float(char *valor){
+
+    int contador = 0;
+
+    for (size_t i = 0; valor[i] != '\0'; i++)
+    {
+        if(i != 0 && contador == 0 && valor[i] == '.'){
+
+            contador++;
+            continue;
+        }
+
+        if(valor[i] == '.' && contador>0 ){
+
+            return 0;
+        }
+
+        if(isdigit(valor[i]) == 0){
+
+            return 0;
+        }
+        
+    }
+
+    int posicao = strlen(valor) -1;
+
+    if(valor[posicao] == '.'){
+
+        return 0;
+    }
+
+    return 1;
+    
+}
+
