@@ -133,7 +133,7 @@ int main()
 
             char *mensagem = NULL;
 
-             char buffer_envio[1024];
+             char buffer_envio[1024] = {0};
 
 
             switch (opcao)
@@ -273,6 +273,78 @@ int main()
             case 5:
                 envia_lista(&lista, socket_cliente);
                 break;
+
+            case 6:
+            {    
+
+                
+
+                mensagem = "Parametros enviados estao errados , ou incompletos.\n";
+
+                if( quantidade !=4 ) {
+
+                    break;
+                }
+
+                int valida = 1;
+
+                for (size_t i = 1; i < 4; i++)
+                {
+                    if(campos[i] == NULL){
+
+                        valida = 0;
+                        break;
+                    }
+
+                    if(i == 3){
+
+                        if(valida_float(campos[i]) == 0) valida = 0;
+                        
+                    }else{
+
+                        if(valida_numero(campos[i]) == 0){
+
+                            valida = 0;
+                            break;
+                        }
+                    }
+                }
+
+                if(!valida){
+
+                    break;
+                }
+
+                int n_conta_origem = atoi(campos[1]);
+                int n_conta_destino = atoi(campos[2]);
+                float valor = atof(campos[3]);
+
+                int resultado = transferencia(&lista,n_conta_origem,n_conta_destino,valor);
+
+                if(resultado == 0){
+
+                    mensagem = "Transferencia realizada com sucesso.\n\n";
+                    break;
+                }
+
+                if(resultado == -1){
+
+                    mensagem = "Erro ao procurar contas.\n\n";
+                }else if(resultado == -3){
+
+                    mensagem ="Valor digitado nao valido.\n\n";
+
+                }else if(resultado == -4){
+
+                    mensagem = "As contas informadas sao as mesmas.\n\n";
+                }else if(resultado == -2){
+
+                    mensagem ="Conta origem nao possui saldo.\n\n";
+                }
+                
+                break;
+
+            }
             case 0:
                 break;
 
@@ -403,6 +475,12 @@ int valida_float(char *valor){
 
     for (size_t i = 0; valor[i] != '\0'; i++)
     {
+
+        if(i == 0 && valor[i] == '.'){
+
+            return 0;
+        }
+
         if(i != 0 && contador == 0 && valor[i] == '.'){
 
             contador++;

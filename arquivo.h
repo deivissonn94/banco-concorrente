@@ -25,4 +25,6 @@ int depositar(Lista *lista,int numero_conta,float deposito);
 
 int sacar(Lista *lista,int numero_conta,float saque);
 
+int transferencia(Lista *lista,int n_conta_origem,int n_conta_destino,float valor);
+
 #endif

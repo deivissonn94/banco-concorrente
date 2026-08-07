@@ -85,11 +85,53 @@ int inserindo_conta(Lista *lista,FILE **arquivo,const char *nome,size_t tamanho_
 
     fechar_arquivo(*arquivo);
     return 0;
-} 
+}
+
+int transferencia(Lista *lista,int n_conta_origem,int n_conta_destino,float valor){
+
+
+    if(!lista){
+
+        return -1;
+    }
+
+    if(valor <= 0) return -3;
+
+    if(n_conta_destino == n_conta_origem) return -4;
+
+
+    Conta *conta_origem = buscar_conta(lista,n_conta_origem);
+    if(!conta_origem) return -1;
+
+    Conta *conta_destino = buscar_conta(lista,n_conta_destino);
+    if(!conta_destino) return -1;
+
+    if(conta_origem->saldo - valor < 0){
+
+        return -2;
+    }
+
+    conta_origem->saldo -= valor;
+
+    conta_destino->saldo += valor;
+
+    int resultado = gravando_dados_apos_alteracoes(lista);
+
+    if(resultado == -1){
+
+        conta_origem->saldo += valor;
+        conta_destino->saldo -= valor;
+        
+    }
+
+    return resultado;
+}
 
 
 //--------------------------------------------------------
 int gravando_dados_apos_alteracoes(Lista *lista){
+
+    if(!lista) return-1; 
 
     FILE *arquivo = fopen("arquivo.dat","wb");
 
@@ -102,6 +144,7 @@ int gravando_dados_apos_alteracoes(Lista *lista){
     {
         if(gravar_dados(atual->conta,arquivo) != 0){
 
+            fclose(arquivo);
             return -1;
         }
 

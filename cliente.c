@@ -239,6 +239,7 @@ void exibir_menu(void)
     printf("3 - Sacar\n");
     printf("4 - Consultar saldo\n");
     printf("5 - Listar contas\n");
+    printf("6 - Transferir\n");
     printf("0 - Sair\n");
     printf("=====================================\n\n");
 }
