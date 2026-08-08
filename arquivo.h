@@ -3,28 +3,23 @@
 
 #include "conta.h"
 
+int gravar_dados_no_final(const Conta *conta);
 
-int abrir_arquivo_leitura(FILE **arquivo);
+int ler_dados(Conta *cliente, FILE *arquivo);
 
-int abrir_arquivo_escrita(FILE **arquivo);
-
-int gravar_dados(const Conta *conta,FILE *arquivo);
-
-int ler_dados(Conta *cliente,FILE *arquivo);
-
-void fechar_arquivo(FILE *arquivo);
-
-int carregar_contas(Lista *lista,FILE **arquivo);
+int carregar_contas(Lista *lista);
 
 int gravando_dados_apos_alteracoes(Lista *lista);
 
-//não e exclusivo 
-int inserindo_conta(Lista *lista,FILE **arquivo,const char *nome,size_t tamanho_nome);
+int gravar_dados(const Conta *conta,FILE *arquivo);
 
-int depositar(Lista *lista,int numero_conta,float deposito);
+// não e exclusivo
+int inserindo_conta(Lista *lista, const char *nome, size_t tamanho_nome);
 
-int sacar(Lista *lista,int numero_conta,float saque);
+int depositar(Lista *lista, int numero_conta, float deposito);
 
-int transferencia(Lista *lista,int n_conta_origem,int n_conta_destino,float valor);
+int sacar(Lista *lista, int numero_conta, float saque);
+
+int transferencia(Lista *lista, int n_conta_origem, int n_conta_destino, float valor);
 
 #endif

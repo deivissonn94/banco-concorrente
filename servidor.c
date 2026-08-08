@@ -14,11 +14,20 @@
 #include <signal.h>   //signal()
 
 #include <unistd.h> //sleep()
-
+#include <pthread.h>
 #include <ctype.h>
 #include "arquivo.h"
 
 #define MAX_CAMPOS 5
+
+typedef struct
+{
+    int socket_cliente;
+    Lista *lista;
+    pthread_mutex_t *mutex;
+} Dados_thread;
+
+Dados_thread *alocando_dados_threads(void);
 
 int valida_numero(char *buffer);
 
@@ -30,17 +39,19 @@ int envia_lista(const Lista *lista, int socket_cliente);
 
 int parser_campos(char *buffer, char **campos);
 
+void *atender_cliente(void *arg);
+
 int main()
 {
+    //iniciando mutex
+    pthread_mutex_t mutex;
+    pthread_mutex_init(&mutex,NULL);
 
     // iniciando lista
     Lista lista;
     iniciar_lista(&lista);
 
-    // iniciando FILE
-    FILE *arquivo;
-
-    carregar_contas(&lista, &arquivo);
+    carregar_contas(&lista);
 
     // Cria o socket do servidor
     int socket_servidor = socket(AF_INET, SOCK_STREAM, 0);
@@ -79,9 +90,70 @@ int main()
     }
 
     // Aceita conexões de clientes
+    while (1)
+    {
 
-    printf("Aguardando cliente conectar.....\n\n");
-    int socket_cliente = accept(socket_servidor, NULL, NULL);
+        printf("Aguardando cliente conectar.....\n\n");
+        int socket_cliente = accept(socket_servidor, NULL, NULL);
+
+        pthread_t thread;
+
+        Dados_thread *dados = alocando_dados_threads();
+        if (!dados)
+        {
+
+            printf("Erro ao alocar dados.\n\n");
+            continue;
+        }
+
+        dados->lista = &lista;
+        dados->socket_cliente = socket_cliente;
+        dados->mutex = &mutex;
+        
+
+        int resultado = pthread_create(&thread, NULL, atender_cliente, dados);
+
+        if (resultado != 0)
+        {
+            printf("Erro ao criar thread: %d\n", resultado);
+            free(dados);
+        }
+        else
+        {
+
+            pthread_detach(thread);
+        }
+    }
+
+    close(socket_servidor);
+
+    pthread_mutex_destroy(&mutex);
+
+    return 0;
+}
+
+Dados_thread *alocando_dados_threads()
+{
+
+    Dados_thread *novo = malloc(sizeof(Dados_thread));
+    if (!novo)
+        return NULL;
+
+    return novo;
+}
+
+void *atender_cliente(void *arg)
+{
+
+    Dados_thread *dados = (Dados_thread *)arg;
+
+    int socket_cliente = dados->socket_cliente;
+    Lista *lista = dados->lista;
+    pthread_mutex_t *mutex = dados->mutex;
+
+
+    printf("Numero do socket do cliente : %d\n\n", socket_cliente);
+    //printf("Thread atendendo cliente...\n");
 
     while (1)
     {
@@ -133,20 +205,27 @@ int main()
 
             char *mensagem = NULL;
 
-             char buffer_envio[1024] = {0};
-
+            char buffer_envio[1024] = {0};
 
             switch (opcao)
             {
             case 1:
             {
-                if(quantidade != 2 || campos[1] == NULL || strlen(campos[1]) == 0 ){
+                if (quantidade != 2 || campos[1] == NULL || strlen(campos[1]) == 0)
+                {
 
                     mensagem = "Parametros enviados estao errados , ou incompletos.\n";
 
                     break;
                 }
-                if (inserindo_conta(&lista, &arquivo, campos[1], strlen(campos[1])) == -1)
+
+                pthread_mutex_lock(mutex);
+
+                int resultado = inserindo_conta(lista, campos[1], strlen(campos[1]));
+
+                pthread_mutex_unlock(mutex);
+
+                if (resultado == -1)
                 {
 
                     mensagem = "Erro ao cadastrar conta.\n";
@@ -161,96 +240,103 @@ int main()
             }
 
             case 2:
-                {   
+            {
 
-                    if( quantidade != 3 ||
-                        campos[1] == NULL ||
-                        strlen(campos[1]) == 0 ||
-                        (valida_numero(campos[1]) == 0) ||
-                        campos[2] == NULL ||
-                        strlen(campos[2]) == 0 ||
-                        (valida_float(campos[2]) == 0))
-                        {
+                if (quantidade != 3 ||
+                    campos[1] == NULL ||
+                    strlen(campos[1]) == 0 ||
+                    (valida_numero(campos[1]) == 0) ||
+                    campos[2] == NULL ||
+                    strlen(campos[2]) == 0 ||
+                    (valida_float(campos[2]) == 0))
+                {
 
-                            mensagem = "Parametros enviados estao errados , ou incompletos.\n";
-
-                            break;
-
-
-                    }
-
-                    int num_conta = atoi(campos[1]);
-                    float valor = atof(campos[2]);
-
-                    if(depositar(&lista,num_conta,valor) == 0){
-
-                        mensagem = "Desposito realizado com sucesso .\n\n";
-                    }else{
-
-                        mensagem = "Falha ao realizar o deposito .\n\n";
-                    }
+                    mensagem = "Parametros enviados estao errados , ou incompletos.\n";
 
                     break;
                 }
-                
 
-                
-                
+                int num_conta = atoi(campos[1]);
+                float valor = atof(campos[2]);
+
+                pthread_mutex_lock(mutex);
+
+                int resulltado = depositar(lista, num_conta, valor);
+
+                pthread_mutex_unlock(mutex);
+
+                if (resulltado == 0)
+                {
+
+                    mensagem = "Desposito realizado com sucesso .\n\n";
+                }
+                else
+                {
+
+                    mensagem = "Falha ao realizar o deposito .\n\n";
+                }
+
+                break;
+            }
+
             case 3:
-                {   
+            {
 
-                    if( quantidade != 3 ||
-                        campos[1] == NULL ||
-                        strlen(campos[1]) == 0 ||
-                        (valida_numero(campos[1]) == 0) ||
-                        campos[2] == NULL ||
-                        strlen(campos[2]) == 0 ||
-                        (valida_float(campos[2]) == 0))
-                        {
+                if (quantidade != 3 ||
+                    campos[1] == NULL ||
+                    strlen(campos[1]) == 0 ||
+                    (valida_numero(campos[1]) == 0) ||
+                    campos[2] == NULL ||
+                    strlen(campos[2]) == 0 ||
+                    (valida_float(campos[2]) == 0))
+                {
 
-                            mensagem = "Parametros enviados estao errados , ou incompletos.\n";
-
-                            break;
-
-
-                    }
-
-                    int num_conta = atoi(campos[1]);
-                    float valor = atof(campos[2]);
-
-                    int resultado = sacar(&lista,num_conta,valor);
-
-                    if(resultado == 0){
-
-                        mensagem = "Saque realizado com sucesso .\n\n";
-                    }else if(resultado == -2){
-
-                        mensagem = "Conta nao possui saldo para efetuar o saque .\n\n";
-                    }else{
-
-                        mensagem = "Falha ao realizar o deposito .\n\n";
-
-                    }
+                    mensagem = "Parametros enviados estao errados , ou incompletos.\n";
 
                     break;
                 }
-                
+
+                int num_conta = atoi(campos[1]);
+                float valor = atof(campos[2]);
+
+                pthread_mutex_lock(mutex);
+
+                int resultado = sacar(lista, num_conta, valor);
+
+                pthread_mutex_unlock(mutex);
+
+                if (resultado == 0)
+                {
+
+                    mensagem = "Saque realizado com sucesso .\n\n";
+                }
+                else if (resultado == -2)
+                {
+
+                    mensagem = "Conta nao possui saldo para efetuar o saque .\n\n";
+                }
+                else
+                {
+
+                    mensagem = "Falha ao realizar o deposito .\n\n";
+                }
+
+                break;
+            }
 
             case 4:
             {
 
-                if(quantidade != 2 || campos[1] == NULL || strlen(campos[1]) == 0  || (valida_numero(campos[1])==0) ) {
+                if (quantidade != 2 || campos[1] == NULL || strlen(campos[1]) == 0 || (valida_numero(campos[1]) == 0))
+                {
 
                     mensagem = "ERRO;Parametros enviados estao errados , ou incompletos.\n";
 
                     break;
-
                 }
 
-               
-
                 int numero_conta = atoi(campos[1]);
-                Conta *buscada = buscar_conta(&lista, numero_conta);
+                Conta *buscada = buscar_conta(lista, numero_conta);
 
                 if (!buscada)
                 {
@@ -271,17 +357,16 @@ int main()
                 break;
             }
             case 5:
-                envia_lista(&lista, socket_cliente);
+                envia_lista(lista, socket_cliente);
                 break;
 
             case 6:
-            {    
-
-                
+            {
 
                 mensagem = "Parametros enviados estao errados , ou incompletos.\n";
 
-                if( quantidade !=4 ) {
+                if (quantidade != 4)
+                {
 
                     break;
                 }
@@ -290,19 +375,24 @@ int main()
 
                 for (size_t i = 1; i < 4; i++)
                 {
-                    if(campos[i] == NULL){
+                    if (campos[i] == NULL)
+                    {
 
                         valida = 0;
                         break;
                     }
 
-                    if(i == 3){
+                    if (i == 3)
+                    {
 
-                        if(valida_float(campos[i]) == 0) valida = 0;
-                        
-                    }else{
+                        if (valida_float(campos[i]) == 0)
+                            valida = 0;
+                    }
+                    else
+                    {
 
-                        if(valida_numero(campos[i]) == 0){
+                        if (valida_numero(campos[i]) == 0)
+                        {
 
                             valida = 0;
                             break;
@@ -310,7 +400,8 @@ int main()
                     }
                 }
 
-                if(!valida){
+                if (!valida)
+                {
 
                     break;
                 }
@@ -319,31 +410,41 @@ int main()
                 int n_conta_destino = atoi(campos[2]);
                 float valor = atof(campos[3]);
 
-                int resultado = transferencia(&lista,n_conta_origem,n_conta_destino,valor);
+                pthread_mutex_lock(mutex);
 
-                if(resultado == 0){
+                int resultado = transferencia(lista, n_conta_origem, n_conta_destino, valor);
+
+                pthread_mutex_unlock(mutex);
+
+                if (resultado == 0)
+                {
 
                     mensagem = "Transferencia realizada com sucesso.\n\n";
                     break;
                 }
 
-                if(resultado == -1){
+                if (resultado == -1)
+                {
 
                     mensagem = "Erro ao procurar contas.\n\n";
-                }else if(resultado == -3){
+                }
+                else if (resultado == -3)
+                {
 
-                    mensagem ="Valor digitado nao valido.\n\n";
-
-                }else if(resultado == -4){
+                    mensagem = "Valor digitado nao valido.\n\n";
+                }
+                else if (resultado == -4)
+                {
 
                     mensagem = "As contas informadas sao as mesmas.\n\n";
-                }else if(resultado == -2){
-
-                    mensagem ="Conta origem nao possui saldo.\n\n";
                 }
-                
-                break;
+                else if (resultado == -2)
+                {
 
+                    mensagem = "Conta origem nao possui saldo.\n\n";
+                }
+
+                break;
             }
             case 0:
                 break;
@@ -360,7 +461,7 @@ int main()
                 break;
             }
 
-            if (opcao != 5 )
+            if (opcao != 5)
             {
 
                 int bytes_enviados = send(socket_cliente, mensagem, strlen(mensagem), 0);
@@ -374,12 +475,14 @@ int main()
             }
         }
     }
+
+    free(dados);
+
     close(socket_cliente);
 
-    close(socket_servidor);
-
-    return 0;
+    return NULL;
 }
+
 int parser_campos(char *buffer, char **campos)
 {
 
@@ -401,7 +504,7 @@ int parser_campos(char *buffer, char **campos)
 
     campos[c] = delimitador;
 
-    return c +1;
+    return c + 1;
 }
 
 void capturar_entrada(char *buffer, size_t tamanho)
@@ -454,59 +557,62 @@ int envia_lista(const Lista *lista, int socket_cliente)
     return 0;
 }
 
-int valida_numero(char *buffer){
+int valida_numero(char *buffer)
+{
 
-
-    for (size_t i = 0;buffer[i] != 0; i++)
+    for (size_t i = 0; buffer[i] != 0; i++)
     {
-        if(isdigit(buffer[i]) == 0){
+        if (isdigit(buffer[i]) == 0)
+        {
 
             return 0;
         }
     }
 
     return 1;
-    
 }
 
-int valida_float(char *valor){
+int valida_float(char *valor)
+{
 
     int contador = 0;
 
     for (size_t i = 0; valor[i] != '\0'; i++)
     {
 
-        if(i == 0 && valor[i] == '.'){
+        if (i == 0 && valor[i] == '.')
+        {
 
             return 0;
         }
 
-        if(i != 0 && contador == 0 && valor[i] == '.'){
+        if (i != 0 && contador == 0 && valor[i] == '.')
+        {
 
             contador++;
             continue;
         }
 
-        if(valor[i] == '.' && contador>0 ){
+        if (valor[i] == '.' && contador > 0)
+        {
 
             return 0;
         }
 
-        if(isdigit(valor[i]) == 0){
+        if (isdigit(valor[i]) == 0)
+        {
 
             return 0;
         }
-        
     }
 
-    int posicao = strlen(valor) -1;
+    int posicao = strlen(valor) - 1;
 
-    if(valor[posicao] == '.'){
+    if (valor[posicao] == '.')
+    {
 
         return 0;
     }
 
     return 1;
-    
 }
-
