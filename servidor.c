@@ -14,8 +14,10 @@
 #include <signal.h>   //signal()
 
 #include <unistd.h> //sleep()
+#include <signal.h>
 #include <pthread.h>
 #include <ctype.h>
+#include <sys/select.h>
 #include "arquivo.h"
 
 #define MAX_CAMPOS 5
@@ -41,11 +43,21 @@ int parser_campos(char *buffer, char **campos);
 
 void *atender_cliente(void *arg);
 
+void encerrar_servidor(int sinal);
+
+volatile sig_atomic_t executando = 1;
+
 int main()
 {
-    //iniciando mutex
+    // parte do signal
+    signal(SIGINT, encerrar_servidor);
+
+    // start file descriptor
+    fd_set conjunto;
+
+    // iniciando mutex
     pthread_mutex_t mutex;
-    pthread_mutex_init(&mutex,NULL);
+    pthread_mutex_init(&mutex, NULL);
 
     // iniciando lista
     Lista lista;
@@ -90,11 +102,41 @@ int main()
     }
 
     // Aceita conexões de clientes
-    while (1)
+    while (executando)
     {
 
-        printf("Aguardando cliente conectar.....\n\n");
-        int socket_cliente = accept(socket_servidor, NULL, NULL);
+        int socket_cliente;
+
+        // executando FILE DESCRIPT
+        FD_ZERO(&conjunto);
+
+        struct timeval tempo;
+        tempo.tv_sec = 1;
+        tempo.tv_usec = 0;
+
+        FD_SET(socket_servidor, &conjunto);
+
+        int resultado_select = select(socket_servidor + 1, &conjunto, NULL, NULL, &tempo);
+        if (resultado_select == -1)
+        {
+
+            if(executando == 0){
+
+                printf("Servido encerrado.\n\n");
+                break;
+            }
+
+             perror("Erro no select");
+             break;
+        }
+        else if (resultado_select > 0)
+        {
+            printf("Aguardando cliente conectar.....\n\n");
+            socket_cliente = accept(socket_servidor, NULL, NULL);
+        }else{
+
+            continue;
+        }
 
         pthread_t thread;
 
@@ -109,7 +151,6 @@ int main()
         dados->lista = &lista;
         dados->socket_cliente = socket_cliente;
         dados->mutex = &mutex;
-        
 
         int resultado = pthread_create(&thread, NULL, atender_cliente, dados);
 
@@ -151,9 +192,8 @@ void *atender_cliente(void *arg)
     Lista *lista = dados->lista;
     pthread_mutex_t *mutex = dados->mutex;
 
-
     printf("Numero do socket do cliente : %d\n\n", socket_cliente);
-    //printf("Thread atendendo cliente...\n");
+    // printf("Thread atendendo cliente...\n");
 
     while (1)
     {
@@ -164,7 +204,7 @@ void *atender_cliente(void *arg)
         {
 
             perror("Erro ao conectar com o cliente");
-            continue;
+            break;
         }
 
         // Recebe dados do cliente
@@ -615,4 +655,10 @@ int valida_float(char *valor)
     }
 
     return 1;
+}
+
+void encerrar_servidor(int sinal)
+{
+    executando = 0;
+    printf("Encerrando servidor...\n");
 }
